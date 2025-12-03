@@ -21,8 +21,9 @@ function createWindow() {
     {
       label: 'View',
       submenu: [
-        { label: 'Home', click: () => mainWindow.loadFile('index.html') },
+        { label: 'Landing Page', click: () => mainWindow.loadFile('landing.html') },
         { label: 'AI Detection', click: () => mainWindow.loadFile('detection.html') },
+        { label: 'Dashboard', click: () => mainWindow.loadFile('index.html') },
         { type: 'separator' },
         { role: 'reload' },
         { role: 'toggleDevTools' }
@@ -44,7 +45,7 @@ function createWindow() {
   ]);
   Menu.setApplicationMenu(menu);
 
-  mainWindow.loadFile('detection.html');
+  mainWindow.loadFile('landing.html');
 
   // Open DevTools in development mode
   if (process.argv.includes('--dev')) {

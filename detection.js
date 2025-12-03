@@ -412,3 +412,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Make switchFileType globally accessible for HTML onclick
 window.switchFileType = switchFileType;
+
+// Navigation function
+function goBack() {
+    document.body.style.opacity = '0';
+    document.body.style.transition = 'opacity 0.3s ease';
+    
+    setTimeout(() => {
+        window.location.href = 'landing.html';
+    }, 300);
+}
+
+// Make goBack globally accessible
+window.goBack = goBack;
