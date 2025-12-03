@@ -1,4 +1,11 @@
+<<<<<<< HEAD
 # Aerial Threat Detection System
+=======
+<<<<<<< HEAD
+# Aerial-Threat-Detection
+=======
+# Aerial Object Detection System
+>>>>>>> main
 
 > AI-powered desktop application for detecting and classifying objects in aerial footage using YOLOv8
 
@@ -186,3 +193,4 @@ GitHub: [@reymartjohneva](https://github.com/reymartjohneva)
 
 **Made with ❤️ by Reymart John Eva**  
 *Star ⭐ this repository if you find it helpful!*
+>>>>>>> development
