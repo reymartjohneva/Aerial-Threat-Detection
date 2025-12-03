@@ -13,47 +13,41 @@ import base64
 from datetime import datetime
 
 class ObjectDetector:
-    def __init__(self, model_path='models/yolov8s.pt', conf_threshold=0.5):
+    def __init__(self, model_path='models/yolov8s.pt', conf_threshold=0.35):
         """
         Initialize the object detector
         
         Args:
             model_path: Path to YOLOv8 model file
-            conf_threshold: Confidence threshold for detections
+            conf_threshold: Confidence threshold for detections (optimized for accuracy)
         """
         self.model_path = model_path
         self.conf_threshold = conf_threshold
+        self.iou_threshold = 0.5  # IOU threshold for NMS (higher = less overlap allowed)
+        self.imgsz = 640  # Image size for inference (higher = better accuracy)
         self.model = None
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.half = False  # Half precision mode
         
-        # Custom class names for aerial detection
+        # ONLY 2 classes from trained model: civilian and soldier
         self.class_names = {
-            0: 'Person',
-            1: 'Soldier',
-            2: 'Civilian',
-            3: 'Vehicle',
-            4: 'Drone',
-            5: 'Aircraft',
-            6: 'Weapon',
-            7: 'Unknown'
+            0: 'civilian',
+            1: 'soldier'
         }
+        
+        # Allowed classes - only detect these 2 classes
+        self.allowed_classes = {'civilian', 'soldier'}
         
         # Class-specific colors (BGR format)
         self.colors = {
-            'Soldier': (0, 0, 255),      # Red
-            'Civilian': (0, 255, 0),     # Green
-            'Person': (255, 165, 0),     # Blue
-            'Vehicle': (0, 165, 255),    # Orange
-            'Drone': (255, 0, 255),      # Magenta
-            'Aircraft': (255, 255, 0),   # Cyan
-            'Weapon': (0, 0, 128),       # Dark Red
-            'Unknown': (255, 255, 255)   # White
+            'soldier': (0, 0, 255),      # Red
+            'civilian': (0, 255, 0)      # Green
         }
         
         self.load_model()
     
     def load_model(self):
-        """Load the YOLOv8 model"""
+        """Load the YOLOv8 model with optimizations"""
         try:
             print(f"Loading model from {self.model_path}")
             print(f"Using device: {self.device}")
@@ -61,7 +55,39 @@ class ObjectDetector:
             self.model = YOLO(self.model_path)
             self.model.to(self.device)
             
-            print("Model loaded successfully!")
+            # Enable half precision for GPU to improve speed
+            if self.device == 'cuda':
+                self.half = True
+                print("Half precision (FP16) enabled for faster inference")
+            
+            # Print the actual class names from the model
+            if hasattr(self.model, 'names'):
+                print(f"\n{'='*60}")
+                print("Model class names detected:")
+                for idx, name in self.model.names.items():
+                    print(f"  Class {idx}: {name}")
+                print(f"{'='*60}\n")
+                
+                # Update our class names and allowed classes based on model
+                self.class_names = {int(idx): name.lower() for idx, name in self.model.names.items()}
+                self.allowed_classes = {name.lower() for name in self.model.names.values()}
+                
+                # Update colors for detected classes
+                for name in self.model.names.values():
+                    name_lower = name.lower()
+                    if name_lower == 'soldier':
+                        self.colors[name_lower] = (0, 0, 255)  # Red
+                    elif name_lower == 'civilian':
+                        self.colors[name_lower] = (0, 255, 0)  # Green
+            
+            # Warm up the model with a dummy image to reduce first inference latency
+            print("Warming up model...")
+            dummy_img = np.zeros((self.imgsz, self.imgsz, 3), dtype=np.uint8)
+            _ = self.model(dummy_img, conf=self.conf_threshold, iou=self.iou_threshold, 
+                          imgsz=self.imgsz, half=self.half, verbose=False)
+            
+            print("Model loaded and warmed up successfully!")
+            print(f"Detection settings: conf={self.conf_threshold}, iou={self.iou_threshold}, imgsz={self.imgsz}")
             return True
         except Exception as e:
             print(f"Error loading model: {e}")
@@ -86,14 +112,14 @@ class ObjectDetector:
             confidence = det['confidence']
             
             # Get color based on class name
-            color = self.colors.get(class_name, self.colors['Unknown'])
+            color = self.colors.get(class_name, (128, 128, 128))
             
-            # Draw bounding box with thickness based on importance
-            thickness = 3 if class_name in ['Soldier', 'Civilian'] else 2
+            # Draw bounding box with higher thickness for better visibility
+            thickness = 3
             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, thickness)
             
-            # Prepare label text
-            label = f"{class_name} {confidence:.0%}"
+            # Prepare label text with detailed confidence percentage
+            label = f"{class_name.upper()} {confidence:.1%}"
             
             # Get text size for background
             font = cv2.FONT_HERSHEY_SIMPLEX
@@ -125,12 +151,12 @@ class ObjectDetector:
                        (x1 + 5, label_y),
                        font, font_scale, (255, 255, 255), font_thickness, cv2.LINE_AA)
             
-            # Add a small icon/indicator for quick identification
-            if class_name == 'Soldier':
+            # Add class-specific indicator
+            if class_name == 'soldier':
                 # Draw small circle in top-right corner of box
                 cv2.circle(annotated_frame, (x2 - 10, y1 + 10), 6, color, -1)
                 cv2.circle(annotated_frame, (x2 - 10, y1 + 10), 6, (255, 255, 255), 1)
-            elif class_name == 'Civilian':
+            elif class_name == 'civilian':
                 # Draw small square in top-right corner of box
                 cv2.rectangle(annotated_frame, (x2 - 16, y1 + 4), (x2 - 4, y1 + 16), color, -1)
                 cv2.rectangle(annotated_frame, (x2 - 16, y1 + 4), (x2 - 4, y1 + 16), (255, 255, 255), 1)
@@ -139,7 +165,7 @@ class ObjectDetector:
     
     def detect_frame(self, frame):
         """
-        Perform detection on a single frame
+        Perform detection on a single frame with optimized settings
         
         Args:
             frame: Input frame (numpy array)
@@ -150,8 +176,34 @@ class ObjectDetector:
         if self.model is None:
             return None
         
-        # Perform inference
-        results = self.model(frame, conf=self.conf_threshold, verbose=False)
+        # Preprocess frame for better detection accuracy
+        # Ensure RGB color space (YOLOv8 expects RGB)
+        if len(frame.shape) == 2:  # Grayscale
+            frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
+        elif frame.shape[2] == 4:  # RGBA
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGBA2RGB)
+        
+        # Apply slight contrast enhancement for better feature extraction
+        # lab = cv2.cvtColor(frame, cv2.COLOR_RGB2LAB)
+        # l, a, b = cv2.split(lab)
+        # clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8,8))
+        # l = clahe.apply(l)
+        # enhanced_frame = cv2.merge([l, a, b])
+        # enhanced_frame = cv2.cvtColor(enhanced_frame, cv2.COLOR_LAB2RGB)
+        
+        # Perform inference with optimized parameters for best accuracy
+        results = self.model(
+            frame, 
+            conf=self.conf_threshold,
+            iou=self.iou_threshold,
+            imgsz=self.imgsz,
+            half=self.half,
+            augment=True,  # Enable test-time augmentation for better accuracy
+            agnostic_nms=False,  # Class-specific NMS for better class distinction
+            max_det=100,  # Maximum detections per image
+            classes=[0, 1],  # Only detect classes 0 (civilian) and 1 (soldier)
+            verbose=False
+        )
         
         detections = []
         
@@ -167,11 +219,19 @@ class ObjectDetector:
                 cls = int(box.cls[0].cpu().numpy())
                 conf = float(box.conf[0].cpu().numpy())
                 
-                # Get class name (use custom names or default)
+                # Get class name from the model
                 if hasattr(result, 'names'):
-                    class_name = result.names[cls]
+                    class_name = result.names[cls].lower()
                 else:
-                    class_name = self.class_names.get(cls, 'Unknown')
+                    class_name = self.class_names.get(cls, 'unknown')
+                
+                # Debug: Print detection info
+                print(f"Detected: Class ID={cls}, Name='{class_name}', Confidence={conf:.2f}")
+                
+                # FILTER: Only process civilian and soldier detections
+                if class_name not in self.allowed_classes:
+                    print(f"  -> Skipped (not in allowed classes: {self.allowed_classes})")
+                    continue  # Skip this detection
                 
                 detection = {
                     'bbox': [float(x1), float(y1), float(x2), float(y2)],
