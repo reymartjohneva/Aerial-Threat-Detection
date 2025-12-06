@@ -66,11 +66,7 @@
           <h2>⚙️ Options</h2>
           
           <div class="option-group">
-            <label>🤖 Model:</label>
-            <select v-model="selectedModel" @change="switchModel">
-              <option value="yolo11s.pt">YOLO11s</option>
-              <option value="yolov8s.pt">YOLOv8s</option>
-            </select>
+            <label>🤖 Model: YOLO11s</label>
           </div>
           
           <div v-if="currentFileType === 'video'" class="option-group">
@@ -142,9 +138,6 @@ const API_BASE = 'http://localhost:5000/api'
 const serverOnline = ref(false)
 const serverStatusText = ref('Checking...')
 
-// Model
-const selectedModel = ref('yolo11s.pt')
-
 // File upload
 const currentFile = ref(null)
 const currentFileType = ref('video')
@@ -198,28 +191,12 @@ const checkServerHealth = async () => {
     if (data.status === 'running') {
       serverOnline.value = true
       serverStatusText.value = 'Online'
-      if (data.current_model) {
-        selectedModel.value = data.current_model + '.pt'
-      }
       return true
     }
   } catch (error) {
     serverOnline.value = false
     serverStatusText.value = 'Offline'
     return false
-  }
-}
-
-const switchModel = async () => {
-  try {
-    const response = await axios.post(`${API_BASE}/model/load`, {
-      model_name: selectedModel.value
-    })
-    if (response.data.success) {
-      serverStatusText.value = `Model: ${response.data.current_model}`
-    }
-  } catch (error) {
-    console.error('Model switch error:', error)
   }
 }
 

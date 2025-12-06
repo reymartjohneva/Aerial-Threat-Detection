@@ -45,8 +45,6 @@ desktop.ini
 uploads/
 !uploads/.gitkeep
 outputs/*.mp4
-
-outputs/*.mp4
 outputs/*.avi
 outputs/*.json
 !outputs/README.md

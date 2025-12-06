@@ -1,17 +1,16 @@
 # Aerial Threat Detection System
 
-> AI-powered desktop application for detecting and classifying objects in aerial footage using YOLO11s & YOLOv8s
+> AI-powered desktop application for detecting and classifying objects in aerial footage using YOLO11s
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Python](https://img.shields.io/badge/python-3.8%2B-blue)
 ![Node](https://img.shields.io/badge/node-14%2B-green)
-![YOLO](https://img.shields.io/badge/YOLO-v11s%20%7C%20v8s-orange)
+![YOLO](https://img.shields.io/badge/YOLO-v11s-orange)
 
 ## ✨ Features
 
 - 🎨 **Modern Landing Page** - Engaging welcome interface with smooth transitions
-- 🤖 **Dual Model Support** - YOLO11s (Latest) & YOLOv8s (Legacy)
-- 🔥 **Hot Model Switching** - Swap between models instantly without restart
+- 🤖 **YOLO11s Model** - Latest YOLO model with improved accuracy
 - 🎥 **Multi-Source Input** - Video files, Images, and YouTube URLs
 - 🌐 **YouTube Integration** - Direct video download and processing from YouTube
 - 🎯 **Color-Coded Detection** - Red (soldiers), Green (civilians)
@@ -24,11 +23,10 @@
 ## 🆕 New in v2.0
 
 - ✅ **YOLO11s Support** - Latest YOLO model with improved accuracy
-- ✅ **Hot Model Switching** - Change models on-the-fly
 - ✅ **YouTube URL Support** - Process videos directly from YouTube
 - ✅ **Multiple Input Types** - Video, Image, and YouTube URL support
 - ✅ **Auto-Server Start** - Backend starts automatically when running `npm start`
-- ✅ **Enhanced UI** - Model selector and input type toggles
+- ✅ **Enhanced UI** - Streamlined interface with improved workflow
 
 ## 📋 Prerequisites
 
@@ -96,16 +94,10 @@ npm start
 2. Click **"Start Detection"**
 3. Select input type: **Video**, **Image**, or **YouTube**
 4. Upload file or enter YouTube URL
-5. Select model: **YOLO11s** or **YOLOv8s**
-6. Configure frame skip (for videos)
-7. Click **"Start Detection"**
-8. View real-time progress and results
-9. Download processed file with annotations
-
-### Hot Model Switching
-- Use the model selector dropdown at the top
-- Switch between **YOLO11s** and **YOLOv8s** anytime
-- Model changes instantly without restarting
+5. Configure frame skip (for videos)
+6. Click **"Start Detection"**
+7. View real-time progress and results
+8. Download processed file with annotations
 
 ### YouTube Video Processing
 1. Click **YouTube** tab
@@ -178,8 +170,8 @@ pip install -r requirements.txt --upgrade
 ```
 
 **Model not found?**
-- YOLOv8s will auto-download on first run
-- Or place your model in `models/` directory
+- Place yolo11s.pt in `models/` directory
+- Model will auto-download on first run
 
 **GPU not detected?**
 ```bash
@@ -205,9 +197,10 @@ GitHub: [@reymartjohneva](https://github.com/reymartjohneva)
 
 ## 🙏 Acknowledgments
 
-- [Ultralytics YOLOv8](https://github.com/ultralytics/ultralytics)
+- [Ultralytics YOLO11](https://github.com/ultralytics/ultralytics)
 - [PyTorch](https://pytorch.org/)
 - [Electron](https://www.electronjs.org/)
+- [Vue.js](https://vuejs.org/)
 - [Flask](https://flask.palletsprojects.com/)
 - [OpenCV](https://opencv.org/)
 

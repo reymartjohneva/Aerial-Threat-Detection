@@ -1,5 +1,5 @@
 """
-YOLOv8 Object Detection Backend
+YOLO11 Object Detection Backend
 Handles video processing and real-time object detection
 """
 
@@ -13,12 +13,12 @@ import base64
 from datetime import datetime
 
 class ObjectDetector:
-    def __init__(self, model_path='models/yolov8s.pt', conf_threshold=0.25):
+    def __init__(self, model_path='models/yolo11s.pt', conf_threshold=0.25):
         """
         Initialize the object detector
         
         Args:
-            model_path: Path to YOLO model file (supports YOLOv8s and YOLO11s)
+            model_path: Path to YOLO11 model file
             conf_threshold: Confidence threshold for detections (lowered for better recall)
         """
         self.model_path = model_path
@@ -52,7 +52,7 @@ class ObjectDetector:
         self.load_model()
     
     def load_model(self):
-        """Load the YOLO model (YOLOv8s or YOLO11s) with optimizations"""
+        """Load the YOLO11 model with optimizations"""
         try:
             print(f"Loading model: {self.model_name} from {self.model_path}")
             print(f"Using device: {self.device}")
@@ -108,17 +108,6 @@ class ObjectDetector:
             return True
         except Exception as e:
             print(f"Error loading model: {e}")
-            return False
-    
-    def switch_model(self, new_model_path):
-        """Switch to a different YOLO model on the fly"""
-        try:
-            print(f"\nSwitching model from {self.model_name} to {Path(new_model_path).stem}...")
-            self.model_path = new_model_path
-            self.model_name = Path(new_model_path).stem
-            return self.load_model()
-        except Exception as e:
-            print(f"Error switching model: {e}")
             return False
     
     def draw_detections(self, frame, detections):
@@ -206,7 +195,7 @@ class ObjectDetector:
             return None
         
         # Preprocess frame for better detection accuracy
-        # Ensure RGB color space (YOLOv8 expects RGB)
+        # Ensure RGB color space (YOLO11 expects RGB)
         if len(frame.shape) == 2:  # Grayscale
             frame = cv2.cvtColor(frame, cv2.COLOR_GRAY2RGB)
         elif frame.shape[2] == 4:  # RGBA

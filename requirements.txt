@@ -5,12 +5,11 @@
 torch>=2.0.0
 torchvision>=0.15.0
 
-# YOLOv8 & YOLO11 Object Detection
+# YOLO11 Object Detection
 ultralytics>=8.0.0
 
 # Computer Vision
 opencv-python>=4.8.0
-opencv-contrib-python>=4.8.0
 
 # Web Framework
 flask>=3.0.0
@@ -22,7 +21,6 @@ numpy>=1.24.0
 
 # Utilities
 werkzeug>=3.0.0
-python-multipart>=0.0.6
 
 # Optional: GPU Support (uncomment if using CUDA)
 # torch-cuda>=2.0.0

@@ -1,7 +1,7 @@
 {
   "name": "aerial-threat-detection",
   "version": "2.0.0",
-  "description": "Aerial Threat Detection Desktop Application with YOLO11s & YOLOv8s",
+  "description": "Aerial Threat Detection Desktop Application with YOLO11s",
   "main": "electron/main.js",
   "scripts": {
     "dev": "vite",

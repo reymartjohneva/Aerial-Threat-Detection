@@ -1,7 +1,6 @@
 """
-Flask API Server for YOLO Object Detection
+Flask API Server for YOLO11 Object Detection
 Provides REST API endpoints for video processing and real-time detection
-Supports YOLOv8s, YOLO11s, and hot model switching
 """
 
 from flask import Flask, request, jsonify, send_file, Response
@@ -86,7 +85,7 @@ def allowed_file(filename, file_type='video'):
         return ext in ALLOWED_VIDEO_EXTENSIONS or ext in ALLOWED_IMAGE_EXTENSIONS
 
 
-def init_detector(model_path='models/yolov8s.pt'):
+def init_detector(model_path='models/yolo11s.pt'):
     """Initialize the object detector"""
     global detector
     try:
@@ -95,7 +94,7 @@ def init_detector(model_path='models/yolov8s.pt'):
             return True
         else:
             print(f"Warning: Model file not found at {model_path}")
-            print("Please place your model.pt or yolov8s.pt in the models/ directory")
+            print("Please place your yolo11s.pt in the models/ directory")
             return False
     except Exception as e:
         print(f"Error initializing detector: {e}")
@@ -361,72 +360,6 @@ def download_file(filename):
     return send_file(filepath, as_attachment=True, download_name=filename)
 
 
-@app.route('/api/models', methods=['GET'])
-def list_models():
-    """List available models"""
-    models = []
-    model_dir = Path(MODEL_FOLDER)
-    
-    for model_file in model_dir.glob('*.pt'):
-        models.append({
-            'name': model_file.name,
-            'path': str(model_file),
-            'size': model_file.stat().st_size
-        })
-    
-    return jsonify({'models': models})
-
-
-@app.route('/api/model/load', methods=['POST'])
-def load_model():
-    """Load/switch to a specific model (hot model switching)"""
-    global detector
-    data = request.get_json()
-    model_name = data.get('model_name', 'yolov8s.pt')
-    model_path = os.path.join(MODEL_FOLDER, model_name)
-    
-    if not os.path.exists(model_path):
-        return jsonify({'error': f'Model {model_name} not found'}), 404
-    
-    try:
-        if detector is None:
-            # Initialize new detector
-            if init_detector(model_path):
-                return jsonify({
-                    'success': True, 
-                    'message': f'Model {model_name} loaded successfully',
-                    'current_model': detector.model_name
-                })
-            else:
-                return jsonify({'error': 'Failed to load model'}), 500
-        else:
-            # Hot swap to new model
-            if detector.switch_model(model_path):
-                return jsonify({
-                    'success': True, 
-                    'message': f'Switched to model {model_name} successfully',
-                    'current_model': detector.model_name
-                })
-            else:
-                return jsonify({'error': 'Failed to switch model'}), 500
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@app.route('/api/model/current', methods=['GET'])
-def get_current_model():
-    """Get currently loaded model info"""
-    if detector is None:
-        return jsonify({'error': 'No model loaded'}), 404
-    
-    return jsonify({
-        'model_name': detector.model_name,
-        'model_path': detector.model_path,
-        'device': detector.device,
-        'conf_threshold': detector.conf_threshold
-    })
-
-
 @app.route('/api/stream/<job_id>')
 def stream_frames(job_id):
     """Stream processed frames in real-time using Server-Sent Events"""
@@ -465,15 +398,15 @@ def stream_frames(job_id):
 if __name__ == '__main__':
     print("=" * 60)
     print("Aerial Object Detection API Server")
-    print("Supports: YOLOv8s, YOLO11s, Hot Model Switching")
+    print("Powered by YOLO11s")
     print("=" * 60)
     
     # Clean up old files on startup
     print("\n🧹 Cleaning up old files...")
     cleanup_old_files()
     
-    # Try to load default model (prefer YOLO11s if available)
-    model_files = ['models/yolo11s.pt', 'models/yolov8s.pt', 'models/model.pt']
+    # Try to load default model (YOLO11s)
+    model_files = ['models/yolo11s.pt', 'models/model.pt']
     model_loaded = False
     
     for model_file in model_files:
@@ -485,9 +418,8 @@ if __name__ == '__main__':
     
     if not model_loaded:
         print("\n⚠️  WARNING: No model file found!")
-        print("Please place your model files in the models/ directory:")
+        print("Please place your model file in the models/ directory:")
         print("  - yolo11s.pt (YOLO11)")
-        print("  - yolov8s.pt (YOLOv8)")
         print("The server will start but detection will not work until a model is loaded.")
     
     print("\n" + "=" * 60)

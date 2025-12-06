@@ -24,7 +24,7 @@
           <div class="feature-card">
             <div class="feature-icon">🤖</div>
             <h3>AI-Powered Analysis</h3>
-            <p>Leveraging YOLO11s & YOLOv8s neural networks for accurate and reliable object detection</p>
+            <p>Leveraging YOLO11s neural networks for accurate and reliable object detection</p>
           </div>
           <div class="feature-card">
             <div class="feature-icon">📊</div>
