@@ -8,6 +8,9 @@ torchvision>=0.15.0
 # YOLO11 Object Detection
 ultralytics>=8.0.0
 
+# YouTube Video Download
+yt-dlp>=2023.0.0
+
 # Computer Vision
 opencv-python>=4.8.0
 

@@ -65,10 +65,10 @@
         </div>
 
         <div class="gallery-card card-3" @click="startDetection">
-          <img src="../assets/forcard3.jpg" alt="Military Grade">
+          <img src="../assets/forcard3.jpg" alt="Advanced Detection">
           <div class="card-overlay">
-            <div class="card-category">MILITARY-GRADE</div>
-            <div class="card-title">SURVEILLANCE<br>TECHNOLOGY</div>
+            <div class="card-category">ADVANCED</div>
+            <div class="card-title">DETECTION<br>TECHNOLOGY</div>
           </div>
         </div>
       </div>
@@ -90,7 +90,7 @@
           <div class="feature-box">
             <div class="feature-icon-box">🤖</div>
             <h3>AI-Powered Classification</h3>
-            <p>Advanced neural networks trained to distinguish between civilian and soldier classifications with 99.5% accuracy for reliable threat assessment.</p>
+            <p>Advanced neural networks trained to distinguish between civilian and soldier classifications with high precision for reliable personnel identification.</p>
           </div>
           
           <div class="feature-box">
@@ -128,8 +128,8 @@
         
         <div class="about-content">
           <div class="about-text">
-            <h3>Mission-Critical Surveillance</h3>
-            <p>SkyGuard Intelligence is a cutting-edge AI-powered platform designed for real-time identification and classification of potential threats in aerial surveillance operations. Leveraging state-of-the-art YOLO11s (You Only Look Once) deep learning architecture, our system provides military-grade accuracy and reliability for critical security applications.</p>
+            <h3>Advanced Surveillance Platform</h3>
+            <p>SkyGuard Intelligence is a cutting-edge AI-powered platform designed for real-time identification and classification of personnel in aerial surveillance operations. Leveraging state-of-the-art YOLO11s (You Only Look Once) deep learning architecture, our system provides high accuracy and reliability for security and monitoring applications.</p>
             
             <h3>Advanced Technology Stack</h3>
             <p>Built with a modern technology stack including Python backend for AI inference, Vue.js frontend for responsive user interface, and Electron for cross-platform desktop deployment. The system utilizes PyTorch and Ultralytics YOLO framework for optimal performance and accuracy.</p>
@@ -145,7 +145,7 @@
             </ul>
             
             <h3>Applications</h3>
-            <p>Ideal for military operations, border security, critical infrastructure protection, event monitoring, and emergency response scenarios where rapid threat identification is essential for operational success and safety.</p>
+            <p>Ideal for security operations, border monitoring, critical infrastructure protection, event surveillance, and emergency response scenarios where rapid personnel identification is essential for operational success and safety.</p>
           </div>
         </div>
       </div>

@@ -14,6 +14,9 @@ import threading
 import queue
 import base64
 import time
+import subprocess
+import re
+import yt_dlp
 from detect import ObjectDetector
 
 app = Flask(__name__)
@@ -183,6 +186,12 @@ def detect_video():
     # Create frame stream queue with larger buffer to prevent dropping frames
     frame_streams[job_id] = queue.Queue(maxsize=60)
     
+    # Get video FPS for proper playback timing
+    import cv2
+    cap = cv2.VideoCapture(video_path)
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    cap.release()
+    
     def process_video_thread():
         try:
             all_detections = []
@@ -218,7 +227,8 @@ def detect_video():
                         'frame_number': result['frame_number'],
                         'progress': result['progress'],
                         'detections': result['detections'],
-                        'count': result['count']
+                        'count': result['count'],
+                        'fps': video_fps
                     }
                     # Use put with timeout to avoid blocking
                     frame_streams[job_id].put(stream_data, block=True, timeout=0.1)
@@ -259,6 +269,139 @@ def detect_video():
         'success': True,
         'job_id': job_id,
         'message': 'Video processing started'
+    })
+
+
+@app.route('/api/detect/youtube', methods=['POST'])
+def detect_youtube():
+    """Download and process YouTube video"""
+    if detector is None:
+        return jsonify({'error': 'Model not loaded. Please check model file.'}), 500
+    
+    data = request.get_json()
+    youtube_url = data.get('url')
+    
+    if not youtube_url:
+        return jsonify({'error': 'No YouTube URL provided'}), 400
+    
+    # Validate YouTube URL
+    youtube_regex = r'^(https?://)?(www\.)?(youtube\.com/watch\?v=|youtu\.be/)[\w-]+'
+    if not re.match(youtube_regex, youtube_url):
+        return jsonify({'error': 'Invalid YouTube URL'}), 400
+    
+    # Generate unique filename
+    import hashlib
+    url_hash = hashlib.md5(youtube_url.encode()).hexdigest()[:10]
+    timestamp = int(time.time())
+    video_filename = f'youtube_{url_hash}_{timestamp}.mp4'
+    video_path = os.path.abspath(os.path.join(UPLOAD_FOLDER, video_filename))
+    output_filename = f'detected_youtube_{url_hash}_{timestamp}.mp4'
+    output_path = os.path.abspath(os.path.join(OUTPUT_FOLDER, output_filename))
+    
+    # Create job ID
+    job_id = video_filename.replace('.', '_')
+    processing_status[job_id] = {
+        'status': 'downloading',
+        'progress': 0,
+        'detections': [],
+        'output_file': output_filename
+    }
+    
+    # Create frame stream queue
+    frame_streams[job_id] = queue.Queue(maxsize=60)
+    
+    def download_and_process():
+        try:
+            # Download YouTube video using yt-dlp Python module
+            print(f"Downloading YouTube video: {youtube_url}")
+            
+            ydl_opts = {
+                'format': 'best[ext=mp4]/best',
+                'outtmpl': video_path,
+                'quiet': False,
+                'no_warnings': False,
+                'noplaylist': True,
+                'progress_hooks': [lambda d: print(f"Download progress: {d.get('status', 'unknown')}")],
+            }
+            
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                ydl.download([youtube_url])
+            
+            if not os.path.exists(video_path):
+                raise Exception("Downloaded video file not found")
+            
+            print(f"Download complete. Processing video...")
+            processing_status[job_id]['status'] = 'processing'
+            
+            # Get video FPS for proper playback timing
+            cap = cv2.VideoCapture(video_path)
+            video_fps = cap.get(cv2.CAP_PROP_FPS)
+            cap.release()
+            
+            # Process the downloaded video
+            all_detections = []
+            frame_skip = 1  # Process every frame for YouTube videos
+            
+            for result in detector.process_video(video_path, output_path, frame_skip):
+                processing_status[job_id]['progress'] = result['progress']
+                
+                frame_base64 = detector.frame_to_base64(result['frame'], quality=60)
+                
+                detection_summary = {
+                    'frame': result['frame_number'],
+                    'count': result['count'],
+                    'detections': result['detections'],
+                    'timestamp': result['timestamp']
+                }
+                all_detections.append(detection_summary)
+                
+                if len(all_detections) > 100:
+                    all_detections.pop(0)
+                
+                processing_status[job_id]['detections'] = all_detections
+                
+                try:
+                    stream_data = {
+                        'type': 'frame',
+                        'frame': frame_base64,
+                        'frame_number': result['frame_number'],
+                        'progress': result['progress'],
+                        'detections': result['detections'],
+                        'count': result['count'],
+                        'fps': video_fps
+                    }
+                    frame_streams[job_id].put(stream_data, block=True, timeout=0.1)
+                except queue.Full:
+                    pass
+            
+            processing_status[job_id]['status'] = 'completed'
+            processing_status[job_id]['progress'] = 100
+            
+            if job_id in frame_streams:
+                frame_streams[job_id].put(None)
+            
+            print(f"YouTube video processing complete: {output_filename}")
+            
+        except Exception as e:
+            import traceback
+            error_details = traceback.format_exc()
+            print(f"Error processing YouTube video: {e}")
+            print(f"Full traceback:\n{error_details}")
+            processing_status[job_id]['status'] = 'error'
+            processing_status[job_id]['error'] = f"{type(e).__name__}: {str(e)}"
+            
+            if job_id in frame_streams:
+                frame_streams[job_id].put(None)
+    
+    # Start download and processing thread
+    thread = threading.Thread(target=download_and_process)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        'success': True,
+        'job_id': job_id,
+        'message': 'YouTube video download and processing started'
     })
 
 

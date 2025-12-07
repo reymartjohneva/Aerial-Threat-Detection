@@ -30,9 +30,39 @@
             >
               🖼️ Image
             </button>
+            <button 
+              :class="['toggle-btn', { active: currentFileType === 'youtube' }]" 
+              @click="switchFileType('youtube')"
+            >
+              🎬 YouTube
+            </button>
           </div>
           
+          <!-- YouTube URL Input -->
+          <div v-if="currentFileType === 'youtube'" class="youtube-input-area">
+            <div class="url-input-group">
+              <input 
+                v-model="youtubeUrl"
+                type="text" 
+                placeholder="Paste YouTube URL here..."
+                class="youtube-url-input"
+                :disabled="isProcessing"
+                @keyup.enter="processYouTubeUrl"
+              >
+              <button 
+                class="btn-process-url" 
+                @click="processYouTubeUrl"
+                :disabled="isProcessing || !youtubeUrl.trim()"
+              >
+                {{ isProcessing ? '⏳ Processing...' : '🎬 Analyze' }}
+              </button>
+            </div>
+            <p class="upload-hint">{{ isProcessing ? '⏳ Processing YouTube video...' : '💡 Supports youtube.com and youtu.be links' }}</p>
+          </div>
+          
+          <!-- File Upload Area -->
           <div 
+            v-else
             class="upload-area" 
             :class="{ 'processing': isProcessing }"
             @dragover.prevent="onDragOver"
@@ -103,10 +133,28 @@
       <div class="preview-panel">
         <h2>🎬 Live Preview</h2>
         <div class="preview-container">
-          <canvas v-if="currentFileType === 'video'" ref="videoCanvas" class="preview-canvas"></canvas>
+          <canvas v-if="currentFileType === 'video' || currentFileType === 'youtube'" ref="videoCanvas" class="preview-canvas"></canvas>
           <img v-else-if="detectedImageUrl" :src="detectedImageUrl" class="preview-image">
           <div v-else class="preview-placeholder">
             <p>No media loaded</p>
+          </div>
+          
+          <!-- Status Overlay for YouTube Download -->
+          <div v-if="isProcessing && processingStatus === 'downloading'" class="status-overlay">
+            <div class="status-content">
+              <div class="loading-spinner"></div>
+              <h3>📹 Downloading YouTube Video...</h3>
+              <p>Please wait while we fetch the video</p>
+            </div>
+          </div>
+          
+          <!-- Status Overlay for Processing -->
+          <div v-else-if="isProcessing && processingStatus === 'processing' && progress < 5" class="status-overlay">
+            <div class="status-content">
+              <div class="loading-spinner"></div>
+              <h3>⚙️ Initializing Detection...</h3>
+              <p>Preparing video for analysis</p>
+            </div>
           </div>
           <div v-if="isProcessing" class="processing-overlay">
             <div class="spinner"></div>
@@ -133,12 +181,14 @@ const serverStatusText = ref('Checking...')
 const currentFile = ref(null)
 const currentFileType = ref('video')
 const fileInput = ref(null)
+const youtubeUrl = ref('')
 
 // Processing
 const isProcessing = ref(false)
 const currentJobId = ref(null)
 const progress = ref(0)
 const framesProcessed = ref(0)
+const processingStatus = ref('')
 
 // Results
 const totalDetections = ref(0)
@@ -152,9 +202,14 @@ let frameBuffer = []
 let animationFrameId = null
 let lastRenderTime = 0
 let isRendering = false
+let videoFPS = 30 // Default FPS, will be updated from stream
+let frameInterval = 1000 / 30 // ms between frames
 
 // Computed
 const uploadText = computed(() => {
+  if (currentFileType.value === 'youtube') {
+    return 'Paste YouTube URL above'
+  }
   return currentFileType.value === 'video' 
     ? 'Drag & drop video or click to browse'
     : 'Drag & drop image or click to browse'
@@ -223,12 +278,14 @@ const cleanupPreviousProcessing = () => {
   soldierCount.value = 0
   civilianCount.value = 0
   detectedImageUrl.value = null
+  processingStatus.value = ''
 }
 
 const switchFileType = (type) => {
   cleanupPreviousProcessing()
   currentFileType.value = type
   currentFile.value = null
+  youtubeUrl.value = ''
 }
 
 const onFileSelect = async (event) => {
@@ -239,6 +296,59 @@ const onFileSelect = async (event) => {
     await startProcessing()
     // Reset file input to allow re-uploading same file
     event.target.value = ''
+  }
+}
+
+const processYouTubeUrl = async () => {
+  if (!youtubeUrl.value.trim()) {
+    alert('Please enter a YouTube URL')
+    return
+  }
+  
+  // Validate YouTube URL
+  const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/
+  if (!youtubeRegex.test(youtubeUrl.value.trim())) {
+    alert('Please enter a valid YouTube URL (youtube.com or youtu.be)')
+    return
+  }
+  
+  cleanupPreviousProcessing()
+  isProcessing.value = true
+  
+  try {
+    const serverHealthy = await checkServerHealth()
+    if (!serverHealthy) {
+      alert('Backend server is not running. Please start the server first.')
+      isProcessing.value = false
+      return
+    }
+    
+    const response = await axios.post(`${API_BASE}/detect/youtube`, {
+      url: youtubeUrl.value.trim()
+    })
+    
+    const data = response.data
+    
+    if (data.success) {
+      currentJobId.value = data.job_id
+      
+      nextTick(() => {
+        if (videoCanvas.value) {
+          const canvas = videoCanvas.value
+          const ctx = canvas.getContext('2d')
+          ctx.clearRect(0, 0, canvas.width, canvas.height)
+        }
+      })
+      
+      startProgressMonitoring()
+      connectToStream(currentJobId.value)
+    } else {
+      throw new Error(data.error || 'Failed to process YouTube video')
+    }
+  } catch (error) {
+    console.error('YouTube processing error:', error)
+    alert(error.response?.data?.error || 'Failed to process YouTube video. Please check the URL and try again.')
+    isProcessing.value = false
   }
 }
 
@@ -389,6 +499,16 @@ const renderNextFrame = () => {
     return
   }
   
+  const currentTime = performance.now()
+  const timeSinceLastFrame = currentTime - lastRenderTime
+  
+  // Only render if enough time has passed based on video FPS
+  if (timeSinceLastFrame < frameInterval && lastRenderTime > 0) {
+    // Schedule next check
+    animationFrameId = requestAnimationFrame(renderNextFrame)
+    return
+  }
+  
   const canvas = videoCanvas.value
   const ctx = canvas.getContext('2d')
   const frameData = frameBuffer.shift()
@@ -440,14 +560,12 @@ const renderNextFrame = () => {
       
       // Schedule next frame rendering
       if (frameBuffer.length > 0) {
-        // Limit buffer size to prevent memory issues and reduce lag
-        if (frameBuffer.length > 5) {
-          // Drop oldest frames to maintain real-time playback
-          const framesToDrop = frameBuffer.length - 3
+        // If buffer is getting too large, drop oldest frames
+        if (frameBuffer.length > 10) {
+          const framesToDrop = frameBuffer.length - 5
           frameBuffer.splice(0, framesToDrop)
-          console.log(`Dropped ${framesToDrop} frames to maintain real-time playback`)
+          console.log(`Dropped ${framesToDrop} frames - buffer too large`)
         }
-        // Render immediately for smoother playback
         animationFrameId = requestAnimationFrame(renderNextFrame)
       } else {
         isRendering = false
@@ -480,6 +598,12 @@ const connectToStream = (jobId) => {
       const data = JSON.parse(event.data)
       
       if (data.type === 'frame') {
+        // Update FPS if provided
+        if (data.fps && data.fps > 0) {
+          videoFPS = data.fps
+          frameInterval = 1000 / videoFPS
+        }
+        
         // Add frame to buffer
         frameBuffer.push({
           frame: data.frame,
@@ -490,6 +614,7 @@ const connectToStream = (jobId) => {
         // Start rendering if not already rendering
         if (!isRendering && videoCanvas.value) {
           isRendering = true
+          lastRenderTime = 0 // Reset timing for first frame
           animationFrameId = requestAnimationFrame(renderNextFrame)
         }
       } else if (data.type === 'complete') {
@@ -523,10 +648,15 @@ const startProgressMonitoring = () => {
       
       progress.value = data.progress || 0
       framesProcessed.value = data.frames_processed || 0
+      processingStatus.value = data.status || ''
       
       if (data.status === 'completed' || data.status === 'error') {
         clearInterval(statusCheckInterval)
         isProcessing.value = false
+        
+        if (data.status === 'error') {
+          alert(`Processing error: ${data.error || 'Unknown error'}`)
+        }
       }
     } catch (error) {
       console.error('Status check error:', error)
@@ -832,6 +962,73 @@ h2 {
   box-shadow: none;
 }
 
+/* YouTube Input Area */
+.youtube-input-area {
+  padding: 2rem;
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.6) 0%, rgba(30, 30, 50, 0.6) 100%);
+  border: 2px dashed rgba(167, 139, 250, 0.3);
+  border-radius: 16px;
+  text-align: center;
+  transition: all 0.3s ease;
+}
+
+.url-input-group {
+  display: flex;
+  gap: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.youtube-url-input {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 2px solid rgba(167, 139, 250, 0.3);
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.youtube-url-input:focus {
+  outline: none;
+  border-color: #a78bfa;
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.3);
+}
+
+.youtube-url-input::placeholder {
+  color: rgba(167, 139, 250, 0.5);
+}
+
+.youtube-url-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-process-url {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, #ff0000 0%, #cc0000 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 700;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(255, 0, 0, 0.3);
+  white-space: nowrap;
+}
+
+.btn-process-url:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 30px rgba(255, 0, 0, 0.5);
+}
+
+.btn-process-url:disabled {
+  background: rgba(107, 114, 128, 0.5);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
 .file-info {
   margin-top: 1.2rem;
   padding: 1.2rem;
@@ -1032,6 +1229,50 @@ h2 {
   border-radius: 12px;
   border: 1px solid rgba(167, 139, 250, 0.3);
   backdrop-filter: blur(10px);
+}
+
+/* Status Overlay for Download/Processing */
+.status-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: 16px;
+}
+
+.status-content {
+  text-align: center;
+  padding: 2rem;
+}
+
+.status-content h3 {
+  font-size: 1.5rem;
+  margin-bottom: 0.5rem;
+  color: #fff;
+  font-weight: 700;
+}
+
+.status-content p {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 0.5rem;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 1.5rem;
+  border: 4px solid rgba(167, 139, 250, 0.2);
+  border-top-color: #a78bfa;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
 .spinner {
